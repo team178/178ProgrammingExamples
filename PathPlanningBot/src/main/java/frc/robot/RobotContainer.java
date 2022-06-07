@@ -133,11 +133,14 @@ public class RobotContainer {
 
   /**
    * Use this to pass the teleop command to the main {@link Robot} class.
+   * 
+   *  We use lambda expression here so while ArcadeDrive is running it constantly updates what LeftStickY/RightStickX is. Without it,
+   * Arcade drive just gets what those values are upon it being called (never updating from then on). You're basically passing ArcadeDrive calls to methods instead of value.
    *
    * @return the command to run in teleop
    */
   public Command getArcadeDriveCommand() {
     return new ArcadeDrive(
-        m_drivetrain, () -> -m_controller.getLeftStickY(), () -> m_controller.getRightStickX());
+        m_drivetrain, () -> -m_controller.getLeftStickY(), () -> m_controller.getRightStickX()); 
     }
 }
