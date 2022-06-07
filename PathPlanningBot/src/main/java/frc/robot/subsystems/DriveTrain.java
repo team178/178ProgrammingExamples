@@ -14,6 +14,9 @@ import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.geometry.Pose2d;
+import edu.wpi.first.wpilibj.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.wpilibj.kinematics.DifferentialDriveWheelSpeeds;
 
 import java.util.function.DoubleSupplier;
 
@@ -52,6 +55,9 @@ public class DriveTrain extends SubsystemBase {
   
   private final DifferentialDrive m_drive = new DifferentialDrive(m_leftMotor, m_rightMotor);
   
+  // Odometry class for tracking robot pose
+  private final DifferentialDriveOdometry m_odometry; 
+
   /** Create a new drivetrain subsystem. */
   public DriveTrain() {
     // We need to invert one side of the drivetrain so that positive voltages
@@ -85,6 +91,8 @@ public class DriveTrain extends SubsystemBase {
     m_drive.setSafetyEnabled(false);
     reset();
 
+    m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d());
+
     addChild("Drive", m_drive);
     addChild("Gyro", m_gyro);
   }
@@ -100,6 +108,18 @@ public class DriveTrain extends SubsystemBase {
   }
 
   /**
+   * Controls the left and right sides of the drive directly with voltages.
+   *
+   * @param leftVolts the commanded left output
+   * @param rightVolts the commanded right output
+   */
+  public void tankDriveVolts(double leftVolts, double rightVolts) {
+    m_leftMotor.setVoltage(leftVolts);
+    m_rightMotor.setVoltage(rightVolts);
+    m_drive.feed();
+  }
+
+  /**
    * Drives the robot using arcade controls.
    *
    * @param fwd the commanded forward movement
@@ -109,6 +129,15 @@ public class DriveTrain extends SubsystemBase {
     m_drive.arcadeDrive(fwd, rot);
   }
 
+  /**
+   * Sets the max output of the drive. Useful for scaling the drive to drive more slowly.
+   *
+   * @param maxOutput the maximum output to which the drive will be constrained
+   */
+  public void setMaxOutput(double maxOutput) {
+    m_drive.setMaxOutput(maxOutput);
+  }
+
   /** Reset the robots sensors to the zero states. */
   public void reset() {
     leftMaster.setSelectedSensorPosition(0);
@@ -116,8 +145,43 @@ public class DriveTrain extends SubsystemBase {
     m_gyro.reset();
   }
 
+  /** Reset the encoders sensors to the zero states */
+  public void resetEncoders() {
+    leftMaster.setSelectedSensorPosition(0);
+    rightMaster.setSelectedSensorPosition(0);
+  }
+
+  /** Zeroes the heading of the robot. */
+  public void zeroHeading() {
+    m_gyro.reset();
+  }
+
+  /**
+   * Resets the odometry to the specified pose.
+   * 
+   * @param pose
+   */
+  public void resetOdometry(Pose2d pose) {
+    resetEncoders();
+    m_odometry.resetPosition(pose, m_gyro.getRotation2d());
+  }
+
+  /**
+   * Returns the heading of the robot.
+   *
+   * @return the robot's heading in degrees, from -180 to 180
+   */
   public double getHeading(){
-    return m_gyro.getAngle();
+    return m_gyro.getRotation2d().getDegrees();
+  }
+
+  /**
+   * Returns the turn rate of the robot.
+   *
+   * @return The turn rate of the robot, in degrees per second
+   */
+  public double getTurnRate() {
+    return -m_gyro.getRate();
   }
 
   /**
@@ -156,6 +220,24 @@ public class DriveTrain extends SubsystemBase {
     return rightPosition.getAsDouble();
   }
 
+  /**
+   * Get the rate of the left encoder since last reset
+   * 
+   * @return rate of the right wheel using the left encoder
+   */
+  public double getLeftRate() {
+    return leftRate.getAsDouble();
+  }
+
+  /**
+   * Get the rate of the left encoder since last reset
+   * 
+   * @return rate of the right wheel using the left encoder
+   */
+  public double getRightRate() {
+    return rightRate.getAsDouble();
+  }
+
     /**
    * Get the average distance of the encoders since the last reset.
    *
@@ -163,6 +245,24 @@ public class DriveTrain extends SubsystemBase {
    */
   public double getDistance() {
     return (getLeftDistance() + getRightDistance()) / 2;
+  }
+
+  /**
+   * Returns the currently-estimated pose of the robot
+   * 
+   * @return
+   */
+  public Pose2d getPose() {
+    return m_odometry.getPoseMeters();
+  }
+
+  /**
+   * Returns the current wheel speeds of the robot
+   * 
+   * @return The current wheel speeds
+   */
+  public DifferentialDriveWheelSpeeds getWheelSpeeds() {
+    return new DifferentialDriveWheelSpeeds(getLeftRate(), getRightRate());
   }
 
   /** The log method puts interesting information to the SmartDashboard. */
@@ -176,6 +276,9 @@ public class DriveTrain extends SubsystemBase {
 
   @Override
   public void periodic() {
+    // Update the odometry in the periodic block
+    m_odometry.update(
+      m_gyro.getRotation2d(), getLeftDistance(), getRightDistance());
     log();
   }
 
