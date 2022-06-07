@@ -62,15 +62,6 @@ public class RobotContainer {
    * @return A SequentialCommand that sets up and executes a trajectory following Ramsete command
    */
   private Command generateRamseteCommand(Trajectory pathweaverTrajectory) {
-    var autoVoltageConstraint =
-    new DifferentialDriveVoltageConstraint(
-      new SimpleMotorFeedforward(
-          DriveConstants.ksVolts,
-          DriveConstants.kvVoltSecondsPerMeter,
-          DriveConstants.kaVoltSecondsSquaredPerMeter),
-      DriveConstants.kDriveKinematics,
-      10);
-
     RamseteCommand ramseteCommand =
         new RamseteCommand(
           pathweaverTrajectory, //Can be replaced by exampleTrajectory if so wished
